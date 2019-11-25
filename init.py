@@ -1,5 +1,6 @@
 import time
 import xlwt
+import cv2
 from interpolants import nearest_neighbor as nn
 
 def create_worksheet( workbook, algorithm, images, dimensions  ):
@@ -28,8 +29,10 @@ def time_tests( images, dimensions, average, algorithms, output_file ):
                 average_time = 0
 
                 for i in range( 0, average ):
+                    image = cv2.imread( curr_img )
+
                     t1 = time.time();
-                    curr_alg( curr_img, curr_dim )
+                    curr_alg( image, curr_dim )
                     t2 = time.time();
                     dt = t2 - t1
                     average_time += dt
