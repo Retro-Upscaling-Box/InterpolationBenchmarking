@@ -1,13 +1,18 @@
-import time
+import timeit
 import xlwt
 import cv2
-from interpolants import nearest_neighbor as nn
+from interpolants import nearest_neighbor
+
+def create_interpolation_wrapper_callable( func, image, dim ):
+    def wrapped_callable():
+        return func( image, dim )
+    return wrapped_callable
 
 def create_worksheet( workbook, algorithm, images, dimensions  ):
-    worksheet = workbook.add_sheet( algorithm.__name__ )
+    worksheet = workbook.add_sheet( algorithm[0] )
 
     for i in range( 0, len( images ) ):
-        worksheet.write( 0, i + 1, images[i] )
+        worksheet.write( 0, i + 1, images[i].split('/')[1] )
 
     for j in range( 0, len( dimensions ) ):
         worksheet.write( j + 1, 0, str( dimensions[j] ) )
@@ -16,6 +21,8 @@ def create_worksheet( workbook, algorithm, images, dimensions  ):
 
 def time_tests( images, dimensions, average, algorithms, output_file ):
     workbook = xlwt.Workbook()
+    style = xlwt.XFStyle()
+    style.num_format_str = '0.000000'
 
     for alg_num in range( 0, len( algorithms ) ):
         curr_alg = algorithms[alg_num]
@@ -26,28 +33,30 @@ def time_tests( images, dimensions, average, algorithms, output_file ):
 
             for dim_num in range( 0, len( dimensions ) ):
                 curr_dim = dimensions[dim_num]
-                average_time = 0
+                image = cv2.imread( curr_img )
+                
+                callable_alg = curr_alg[1]
+                wrapped_callable = create_interpolation_wrapper_callable( callable_alg, image, curr_dim )
+                
+                average_time = timeit.timeit(wrapped_callable, number=average)
 
-                for i in range( 0, average ):
-                    image = cv2.imread( curr_img )
-
-                    t1 = time.time();
-                    curr_alg( image, curr_dim )
-                    t2 = time.time();
-                    dt = t2 - t1
-                    average_time += dt
-    
+                # change to ns
+                average_time *= ( 10 ** 9 )
                 average_time /= average
-                worksheet.write( dim_num + 1, img_num + 1, str( average_time ) )
+                worksheet.write( dim_num + 1, img_num + 1, average_time, style )
 
     workbook.save( output_file )
 
 
 if __name__ == '__main__':
+    # TODO: get better test images
     images = [
                 'images/hat-guy.png'
-             ]
+             ] 
     
+    num_avg = 1000
+   
+   # TODO: update this with better values
     dimensions = [
                     ( 32, 32 ),
                     ( 64, 64 ),
@@ -58,12 +67,18 @@ if __name__ == '__main__':
                     ( 2048, 2048 ),
                     ( 4096, 4096 )
                  ]
-    
-    num_avg = 10
 
     algorithms = [
-                    nn.nearest_neighbor_cv
+                    ( 'Nearest Neighbor CV', nearest_neighbor.scale_cv )
                  ]
 
+    # This is just to test our algorithm before benchmarking it
+    img = cv2.imread('images/hat-guy.png')
+    new_img = nearest_neighbor.scale( img, dimensions[4] )
+    cv2.imshow('image', new_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # Run the benchmark
     output_file = "Interpolation_Benchmark.xls"
     time_tests( images, dimensions, num_avg, algorithms, output_file )
